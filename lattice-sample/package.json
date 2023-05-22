@@ -1,0 +1,19 @@
+{
+  "name": "lattice-sample",
+  "version": "1.0.0",
+  "description": "Sample project for a LattiCe project.",
+  "private": true,
+  "main": "./src/main.c",
+  "scripts": {
+    "run": "lattice run",
+    "build": "lattice build",
+    "build:win": "lattice build --platform=win32",
+    "build:linux": "lattice build --platform=linux"
+  },
+  "lattice": {
+    "outdir": "./dist"
+  },
+  "devDependencies": {
+    "lattice-cli": "workspace:^1.0.0"
+  }
+}

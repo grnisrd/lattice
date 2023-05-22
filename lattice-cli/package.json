@@ -1,0 +1,33 @@
+{
+  "name": "lattice",
+  "version": "1.0.0",
+  "description": "an incredibly lightweight C development environment that integrates well into the node ecosystem",
+  "main": "dist/index.js",
+  "bin": {
+    "lattice": "./dist/cli.js"
+  },
+  "scripts": {
+    "make": "esbuild ./src/index.ts ./src/cli.ts --bundle --minify --outdir=dist --platform=node",
+    "make:dev": "esbuild ./src/index.ts ./src/cli.ts --bundle --outdir=dist --platform=node",
+    "dev": "esbuild ./src/index.ts ./src/cli.ts --bundle --outdir=dist --platform=node --watch",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "c",
+    "ide",
+    "lattice",
+    "lattice-cli",
+    "compiler"
+  ],
+  "author": "grnisrd",
+  "license": "MIT",
+  "devDependencies": {
+    "@inquirer/input": "^1.1.2",
+    "@inquirer/select": "^1.1.7",
+    "@types/inquirer": "^9.0.3",
+    "@types/node": "^20.2.3",
+    "esbuild": "^0.17.19",
+    "inquirer": "^9.2.6"
+  },
+  "homepage": "https://github.com/grnisrd/lattice"
+}
