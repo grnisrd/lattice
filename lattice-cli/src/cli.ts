@@ -162,10 +162,17 @@ async function main() {
   const args = process.argv.slice(2)
   const mode = args.shift()
 
+  let cliOptions = [] as string[]
+  let cliOptStart = args.indexOf('--')
+  if (cliOptStart > -1) {
+    cliOptions = args.slice(cliOptStart)
+  }
+
   try {
     if (mode === 'run' || mode === 'build') {
       await tcc.processLatticeProject({
         root: process.cwd(),
+        cliOptions,
         mode,
       })
     } else if (mode === 'init') {

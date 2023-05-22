@@ -15,7 +15,7 @@
 - **Support for some GNU/MSVC extensions.**  
   Some GNU and MSVC extensions to the language are supported, such as case ranges, `__attribute__`, `typeof`, `#pragma pack`, computed gotos, and inline assembly.
 
-## Getting started
+## Usage
 ```sh
 # Install the lattice CLI.
 npm i @lattice/lattice-cli -g
@@ -33,6 +33,39 @@ lattice build
 ```
 
 The lattice CLI tool handles project and compiler configuration for you. There is no need to setup a compiler as lattice includes its own, but it is possible to use another with specialized configuration (even though it somewhat defeats the point of the project).
+
+### Flags
+>⚠️ You should generally avoid using compiler flags, as configuring the compiler (beyond the adjustments offered in the package configuration) should generally be left to be done by the CLI tool.
+
+Compiler flags must be passed after an empty `--` flag. For example, to enable debug mode while building your executable, you must pass the `-g` flag as such: `lattice build -- -g`
+
+#### Debug flags
+| Flag | Description |
+|-|-|
+`-g` | Enable debug mode. Compiler will include debug information in the executable so that you get clear runtime error messages.
+`-bt N` | Display `N` callers in stack traces (for use with `-g`).
+
+#### Warnings flags
+| Flag | Description |
+|-|-|
+`-Wall` | Activate all warnings.
+`-Werror` | Abort compilation if warnings are issued.
+`-Wimplicit-function-declaration` | Warn about implicit function declaration.
+`-Wunsupported` | Warn about unsupported gcc features that are not supported/ignored by the `tcc` compiler.
+`-Wwrite-strings` | Enforce string constants  to be of type `const char*` instead of `char*`.
+
+#### Preprocessor flags
+| Flag | Description |
+|-|-|
+`-Dsym[=val]` | Define preprocessor symbol `sym` to `val`. If `val` is not present, its value is `1`. Function-like macros can also be defined: `-DF(a)=a+1`
+`-Usym` | Undefine preprocessor symbol `sym`.
+`-E` | Preprocess to file only.
+
+#### Codegen flags
+| Flag | Description |
+|-|-|
+`-mfloat-abi` | **⚠️ ARM ONLY**. Select the float ABI. Possible values: `softfp` and `hard`
+`-mno-sse` | Avoid using SSE registers on x86_64.
 
 ## Dependency management
 Dependencies are managed in the same way you'd manage your standard node dependencies. They can be added through `npm install` (or equivalent) and lattice will automatically include them in your project, so there is no need to manually setup include paths. The CLI tool will also automatically build any dependencies as needed, and link them against your executable.

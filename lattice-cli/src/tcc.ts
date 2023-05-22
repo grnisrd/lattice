@@ -76,6 +76,11 @@ export interface LatticeProcessOptions {
   mode?: 'build' | 'run'
 
   /**
+   * Additonal options to pass to the compiler.
+   */
+  cliOptions?: string[]
+
+  /**
    * Overrides for the lattice package configuration.
    */
   overrides?: Partial<LatticePackageConfig>
@@ -192,9 +197,8 @@ export async function processLatticeProject(options: LatticeProcessOptions) {
   }
 
   // Setup output options.
-  //tccargs.push('-static')
   if (latticeConf.type === 'lib') {
-    //tccargs.push('-shared')
+    tccargs.push('-static', '-shared')
   }
 
   // Setup compilation flags.
@@ -206,6 +210,14 @@ export async function processLatticeProject(options: LatticeProcessOptions) {
 
   if (latticeConf.dollarsInNames) {
     tccargs.push('-fdollars-in-identifiers')
+  }
+
+  // TODO: Deps.
+  if (
+    latticeConf.boundaryChecks === 'app+deps' ||
+    latticeConf.boundaryChecks === 'app'
+  ) {
+    tccargs.push('-b')
   }
 
   // Subsystem set. Windows only.

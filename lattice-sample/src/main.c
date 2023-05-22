@@ -3,6 +3,6 @@
 
 int main(void)
 {
-    printf("Hello world from Lattice1!\n");
+    printf("Hello world from Lattice!\n");
     return 0;
 }
