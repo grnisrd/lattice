@@ -228,6 +228,9 @@ export async function processLatticeProject(options: LatticeProcessOptions) {
     )
   }
 
+  // Push rest of CLI options
+  tccargs.push(...(options.cliOptions ?? []))
+
   // Build or run depending on mode provided.
   const entrypoint = path.resolve(options.root, pkg.main)
   if (options.mode === 'run') {
