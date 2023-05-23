@@ -26,8 +26,11 @@
     "@inquirer/select": "^1.1.7",
     "@types/inquirer": "^9.0.3",
     "@types/node": "^20.2.3",
+    "chalk": "^5.2.0",
     "esbuild": "^0.17.19",
-    "inquirer": "^9.2.6"
+    "glob": "^10.2.6",
+    "inquirer": "^9.2.6",
+    "ora": "^6.3.1"
   },
   "homepage": "https://github.com/grnisrd/lattice"
 }
