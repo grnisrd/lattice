@@ -1,10 +1,13 @@
 #! /usr/bin/env node
 import fs from 'node:fs'
 import path from 'node:path'
-import * as tcc from './tcc'
-
+import { format } from 'node:util'
+import chalk from 'chalk'
 import input from '@inquirer/input'
 import select from '@inquirer/select'
+
+import { build, initBst, execJitBst } from './index'
+import { Logger } from './logsys'
 
 const sampleEntrypoint = `#include <stdio.h>
 
@@ -158,7 +161,21 @@ async function createProject(cwd: string, name?: string) {
   console.log(`\tlattice run`)
 }
 
+function styleOutputs() {
+  // Replace prints.
+  const [oldLog, oldWarn, oldError] = [console.log, console.warn, console.error]
+  console.log = (...args: string[]) =>
+    oldLog(`${chalk.white(chalk.bgBlueBright('[i]'))} ${format(...args)}`)
+  console.info = console.log
+  console.warn = (...args: string[]) =>
+    oldWarn(`${chalk.black(chalk.bgYellowBright('[!]'))} ${format(...args)}`)
+  console.error = (...args: string[]) =>
+    oldError(`${chalk.black(chalk.bgRedBright('[X]'))} ${format(...args)}`)
+}
+
 async function main() {
+  styleOutputs()
+
   const args = process.argv.slice(2)
   const mode = args.shift()
 
@@ -168,16 +185,23 @@ async function main() {
     cliOptions = args.slice(cliOptStart)
   }
 
+  const cwd = process.cwd()
+
   try {
-    if (mode === 'run' || mode === 'build') {
-      await tcc.processLatticeProject({
-        root: process.cwd(),
-        cliOptions,
-        mode,
-      })
+    if (mode === 'run') {
+      const log = new Logger(true)
+      const [bst, lst] = await initBst(cwd, true, args.includes('--clean'))
+      await build(bst, lst, log)
+      log.unstatus(log.state.errs.length === 0)
+      await execJitBst(bst, cliOptions)
+    } else if (mode === 'build') {
+      const log = new Logger()
+      const [bst, lst] = await initBst(cwd, false, args.includes('--clean'))
+      await build(bst, lst, log)
+      log.unstatus(log.state.errs.length === 0)
     } else if (mode === 'init') {
       const projectName = args.shift()
-      await createProject(process.cwd(), projectName)
+      await createProject(cwd, projectName)
     } else {
       console.error(`Unknown lattice command "${mode}".`)
     }

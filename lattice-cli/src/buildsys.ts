@@ -1,9 +1,9 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { spawn } from 'node:child_process'
+
 import { ILogger } from './logsys'
 import createState, { LatticeState, LatticePackage } from './state'
-import { dependencyIncludePathsForState } from './dependencies'
 
 /**
  * Root of lattice-cli's source code.
@@ -74,21 +74,28 @@ function ptemp(state: LatticeState, ...args: string[]) {
  */
 async function processAsync(command: string, args: string[]) {
   const childProcess = spawn(command, args, {
-    stdio: 'inherit',
     cwd: path.dirname(command),
   })
 
-  return new Promise<void>((resolve, reject) => {
+  let childOutput = [] as string[]
+  childProcess.stdout.on('data', (data) => {
+    childOutput.push(data.toString())
+  })
+  childProcess.stderr.on('data', (data) => {
+    childOutput.push(data.toString())
+  })
+
+  return new Promise<string[]>((resolve, reject) => {
     childProcess.on('close', (code) => {
       if (code === 0) {
-        resolve()
+        resolve(childOutput)
       } else {
-        reject(new Error(`Process exited with code ${code}`))
+        reject(childOutput)
       }
     })
 
     childProcess.on('error', (err) => {
-      reject(err)
+      reject(childOutput)
     })
   })
 }
@@ -312,6 +319,8 @@ export async function build(
     return true // Already built.
   }
 
+  log.task(`Compiling "${lst.pkg.name}"`)
+
   // Retrieve and build dependencies.
   const deps = await dependencies(lst, log)
   if (deps.length > 0) {
@@ -339,7 +348,20 @@ export async function build(
         `"${lst.pkg.name}" is defined as JIT-only. Compilation has been aborted.`
       )
     }
-    await processAsync(bst.compilerPath, await buildArgs(bst, lst, deps, isdep))
+
+    try {
+      await processAsync(
+        bst.compilerPath,
+        await buildArgs(bst, lst, deps, isdep)
+      )
+    } catch (output) {
+      try {
+        ;(output as string[]).forEach((l) => log.error(l))
+        return
+      } catch (e) {
+        throw e
+      }
+    }
   }
 
   // Mark this package as built in the global buildstate.

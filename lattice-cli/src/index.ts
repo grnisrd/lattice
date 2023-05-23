@@ -1,1 +1,1 @@
-export * from './tcc'
+export { build, initBst, execJitBst } from './buildsys'

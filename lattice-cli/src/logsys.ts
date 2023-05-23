@@ -29,7 +29,7 @@ export interface ILogger {
 }
 
 export class Logger implements ILogger {
-  private _t = {
+  state = {
     init: false,
     name: '',
     infos: [] as string[],
@@ -37,6 +37,7 @@ export class Logger implements ILogger {
     errs: [] as string[],
   }
 
+  private _silent: boolean
   private _statusOra: Ora | undefined
   private _statusTxt: string = ''
   private _status: string = ''
@@ -52,52 +53,77 @@ export class Logger implements ILogger {
     }
 
     // Print errors and warnings first.
-    if (this._t.init) {
-      this._t.errs.forEach((t) => console.error(`[${this._t.name}] ${t}`))
-      this._t.warns.forEach((t) => console.warn(`[${this._t.name}] ${t}`))
-      this._t.infos.forEach((t) => console.info(`[${this._t.name}] ${t}`))
+    if (this.state.init) {
+      this.state.errs.forEach((t) => console.error(t))
+      this.state.warns.forEach((t) => console.warn(t))
+      if (!this._silent) {
+        this.state.infos.forEach((t) => console.info(t))
+      }
     }
 
     // Start spin with no status text.
-    this._statusOra = ora(name).start()
+    if (!this._silent) {
+      this._statusOra = ora(name).start()
+    }
 
-    this._t = {
+    this.state = {
       init: true,
       name: name,
       infos: [],
       warns: [],
       errs: [],
     }
+
+    this.status(name)
   }
 
   status(text: string) {
     let suffix = ''
-    if (this._t.warns.length > 0 || this._t.errs.length > 0) {
-      const wl = this._t.warns.length
-      const el = this._t.errs.length
-      suffix = `(${wl} warning${wl === 1 ? '' : 's'}${
-        wl > 0 && el > 0 ? ', ' : ''
-      }${el} error${el === 1 ? '' : 's'})`
+    if (this.state.warns.length > 0 || this.state.errs.length > 0) {
+      const wl = this.state.warns.length
+      const el = this.state.errs.length
+      suffix = `(${wl} warning${wl === 1 ? '' : 's'}, ${el} error${
+        el === 1 ? '' : 's'
+      })`
     }
 
     this._statusTxt = text
-    this._status = `${text}${suffix}`
+    this._status = `${text} ${suffix}`
     if (this._statusOra) {
       this._statusOra.text = this._status
     }
   }
 
   info(text: string) {
-    this._t.infos.push(text)
+    this.state.infos.push(text)
   }
 
   warn(text: string) {
-    this._t.warns.push(text)
+    this.state.warns.push(text)
     this.status(this._statusTxt)
   }
 
   error(text: string) {
-    this._t.errs.push(text)
+    this.state.errs.push(text)
     this.status(this._statusTxt)
+  }
+
+  unstatus(good?: boolean) {
+    good ? this._statusOra?.succeed() : this._statusOra?.fail()
+    if (this.state.init) {
+      this.state.errs.forEach((t) => console.error(t))
+      this.state.warns.forEach((t) => console.warn(t))
+      if (!this._silent) {
+        this.state.infos.forEach((t) => console.info(t))
+      }
+    }
+  }
+
+  /**
+   *
+   * @param silent If true, infos are silenced (but not warnings/errors).
+   */
+  constructor(silent?: boolean) {
+    this._silent = silent ?? false
   }
 }
