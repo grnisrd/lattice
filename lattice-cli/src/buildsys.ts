@@ -331,6 +331,14 @@ export async function build(
     ;(<{ jitReady: boolean }>bst).jitReady = true
   } else {
     // Proceed with normal compilation.
+    if (
+      lst.options.buildOptions?.type === 'bin' &&
+      lst.options.buildOptions?.jitOnly
+    ) {
+      throw new Error(
+        `"${lst.pkg.name}" is defined as JIT-only. Compilation has been aborted.`
+      )
+    }
     await processAsync(bst.compilerPath, await buildArgs(bst, lst, deps, isdep))
   }
 
