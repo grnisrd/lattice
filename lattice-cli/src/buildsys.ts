@@ -1,5 +1,6 @@
 import fs from 'node:fs'
 import path from 'node:path'
+import { spawn } from 'node:child_process'
 import { ILogger } from './logsys'
 import createState, { LatticeState, LatticePackage } from './state'
 import { dependencyIncludePathsForState } from './dependencies'
@@ -11,9 +12,30 @@ const sourceroot = path.resolve(__dirname, '..')
 
 interface BuildState {
   /**
+   * Prepare this bst for JIT execution.
+   */
+  jit?: boolean
+
+  /**
+   * Set by `build(...)` after main project is compiled. If `true`, this bst can be
+   * passed to `execJitBst` to run the package.
+   */
+  readonly jitReady?: boolean
+
+  /**
    * List of built projects (including dependencies).
    */
   built: Record<string, boolean>
+
+  /**
+   * Main state.
+   */
+  rootState: LatticeState
+
+  /**
+   * All built dependencies.
+   */
+  rootDeps: DependencyInfo[]
 
   /**
    * Path to compiler binary.
@@ -45,6 +67,30 @@ interface DependencyInfo {
 
 function ptemp(state: LatticeState, ...args: string[]) {
   return path.join(state.root, '.lattice', ...args)
+}
+
+/**
+ * Execute a process asynchronously.
+ */
+async function processAsync(command: string, args: string[]) {
+  const childProcess = spawn(command, args, {
+    stdio: 'inherit',
+    cwd: path.dirname(command),
+  })
+
+  return new Promise<void>((resolve, reject) => {
+    childProcess.on('close', (code) => {
+      if (code === 0) {
+        resolve()
+      } else {
+        reject(new Error(`Process exited with code ${code}`))
+      }
+    })
+
+    childProcess.on('error', (err) => {
+      reject(err)
+    })
+  })
 }
 
 /**
@@ -150,37 +196,12 @@ async function dependencies(lst: LatticeState, log: ILogger) {
   return infos as readonly DependencyInfo[]
 }
 
-/**
- * Build a lattice package.
- * @param bst The global BuildState retrieved from `initBst`.
- * @param lst The LatticeState of the project you want to build.
- * @param log Logger instance. (`new Logger()` from `/logsys`)
- * @param isdep Set to `true` if building a dependency.
- * @returns
- */
-export async function build(
+async function buildArgs(
   bst: BuildState,
   lst: LatticeState,
-  log: ILogger,
+  deps: readonly DependencyInfo[],
   isdep?: boolean
 ) {
-  if (bst.built[lst.pkg.name]) {
-    return true // Already built.
-  }
-
-  // Retrieve and build dependencies.
-  const deps = await dependencies(lst, log)
-  if (deps.length > 0) {
-    // Create the folder for all dependencies to be built.
-    if (!fs.existsSync(bst.libraryContainer)) {
-      await fs.promises.mkdir(bst.libraryContainer)
-    }
-
-    for (const dep of deps) {
-      await build(bst, dep.state, log, true)
-    }
-  }
-
   // Build arguments.
   const buildargs = [] as string[]
 
@@ -250,6 +271,69 @@ export async function build(
     buildargs.push('-b')
   }
 
+  // Subsystem set. Windows executables only.
+  if (
+    lst.options.buildOptions?.type === 'bin' &&
+    process.platform === 'win32'
+  ) {
+    buildargs.push(
+      `-Wl,-subsystem=${
+        lst.options.buildOptions?.winpe === 'gui' ? 'gui' : 'console'
+      }`,
+      '-mms-bitfields'
+    )
+  }
+
+  // Pass additional commandline args.
+  buildargs.push(...(lst.options.compilerOptions?.additionalArguments ?? []))
+
+  // Pass entrypoint.
+  buildargs.unshift(path.resolve(lst.root, lst.pkg.main))
+
+  // Build args done!
+  return buildargs
+}
+
+/**
+ * Build a lattice package.
+ * @param bst The global BuildState retrieved from `initBst`.
+ * @param lst The LatticeState of the project you want to build.
+ * @param log Logger instance. (`new Logger()` from `/logsys`)
+ * @param isdep Set to `true` if building a dependency.
+ * @returns
+ */
+export async function build(
+  bst: BuildState,
+  lst: LatticeState,
+  log: ILogger,
+  isdep?: boolean
+) {
+  if (bst.built[lst.pkg.name]) {
+    return true // Already built.
+  }
+
+  // Retrieve and build dependencies.
+  const deps = await dependencies(lst, log)
+  if (deps.length > 0) {
+    // Create the folder for all dependencies to be built.
+    if (!fs.existsSync(bst.libraryContainer)) {
+      await fs.promises.mkdir(bst.libraryContainer)
+    }
+
+    for (const dep of deps) {
+      await build(bst, dep.state, log, true)
+      bst.rootDeps.push(dep)
+    }
+  }
+
+  // Bst is JIT-ready if this is the root package.
+  if (bst.jit && lst === bst.rootState) {
+    ;(<{ jitReady: boolean }>bst).jitReady = true
+  } else {
+    // Proceed with normal compilation.
+    await processAsync(bst.compilerPath, await buildArgs(bst, lst, deps, isdep))
+  }
+
   // Mark this package as built in the global buildstate.
   bst.built[lst.pkg.name] = true
 }
@@ -259,24 +343,43 @@ export async function build(
  * Returns the init BuildState and the LatticeState to compile
  * the main package.
  * @param root Root directory of main package.
+ * @param jit Prepare this BuildState for JIT execution. Use `execJitBst` to execute afterwards.
  * @param clean Whether the `.lattice` workdir should be cleaned.
  * @returns
  */
-export async function initBst(root: string, clean?: boolean) {
+export async function initBst(root: string, jit?: boolean, clean?: boolean) {
   // Create the root package.
-  const rootpkg = await createState(root)
+  const state = await createState(root)
 
   // Prepare environment for the root package.
-  await prepareEnvironment(rootpkg, clean)
+  await prepareEnvironment(state, clean)
 
   // Create initial build state.
   const bst = {
     built: {},
+    rootState: state,
+    rootDeps: [],
     compilerPath: retrieveCompilerPath(process.platform),
-    libraryContainer: path.join(ptemp(rootpkg), 'lib'),
+    libraryContainer: path.join(ptemp(state), 'lib'),
     forceBoundaryChkForDeps:
-      rootpkg.options.buildOptions?.boundaryChecks === 'app+deps',
+      state.options.buildOptions?.boundaryChecks === 'app+deps',
+    jit,
+    jitReady: false,
   } as BuildState
 
-  return [bst, rootpkg] as const
+  return [bst, state] as const
+}
+
+/**
+ * Run a JIT-ready BuildState.
+ * @param bst JIT-ready BuildState
+ * @param args Any arguments to pass to the program.
+ */
+export async function execJitBst(bst: BuildState, args?: string[]) {
+  const jitargs = [
+    '-run',
+    ...(await buildArgs(bst, bst.rootState, bst.rootDeps)),
+    ...(args ?? []),
+  ]
+  await processAsync(bst.compilerPath, jitargs)
 }
