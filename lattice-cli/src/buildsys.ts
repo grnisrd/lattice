@@ -8,9 +8,16 @@ import createState, { LatticeState, LatticePackage } from './state'
 /**
  * Root of lattice-cli's source code.
  */
-const sourceroot = path.resolve(__dirname, '..')
+let sourceroot: string
 
-interface BuildState {
+// HACK: Adjust vitest dependency configuration to avoid this problem in the future.
+if (process.env.VITEST) {
+  sourceroot = path.resolve(__dirname, 'lattice-cli')
+} else {
+  sourceroot = path.resolve(__dirname, '..')
+}
+
+export interface BuildState {
   /**
    * Prepare this bst for JIT execution.
    */
@@ -203,6 +210,26 @@ async function dependencies(lst: LatticeState, log: ILogger) {
   return infos as readonly DependencyInfo[]
 }
 
+/**
+ * Calculate destination directory for lst.
+ */
+function destDirectory(bst: BuildState, lst: LatticeState, isdep?: boolean) {
+  if (lst.options.buildOptions?.type === 'lib') {
+    if (isdep) {
+      // Output to the convenient library container.
+      return path.join(bst.libraryContainer, lst.pkg.name!) + '.a'
+    } else {
+      // Output to provided outdir.
+      return path.join(lst.root, lst.options.outdir!, lst.pkg.name!) + '.a'
+    }
+  } else {
+    return (
+      path.join(lst.root, lst.options.outdir!, lst.pkg.name!) +
+      (process.platform === 'win32' ? '.exe' : '')
+    )
+  }
+}
+
 async function buildArgs(
   bst: BuildState,
   lst: LatticeState,
@@ -212,29 +239,12 @@ async function buildArgs(
   // Build arguments.
   const buildargs = [] as string[]
 
-  // Setup output binary.
+  // Setup output directory.
+  buildargs.push('-o', destDirectory(bst, lst, isdep))
+
+  // If we're a library, use static binary output.
   if (lst.options.buildOptions?.type === 'lib') {
-    // Build as library.
     buildargs.push('-static', '-shared')
-    if (isdep) {
-      // Output to the convenient library container.
-      buildargs.push(
-        '-o',
-        path.join(bst.libraryContainer, lst.pkg.name!) + '.a'
-      )
-    } else {
-      // Output to provided outdir.
-      buildargs.push(
-        '-o',
-        path.join(lst.root, lst.options.outdir!, lst.pkg.name!) + '.a'
-      )
-    }
-  } else {
-    buildargs.push(
-      '-o',
-      path.join(lst.root, lst.options.outdir!, lst.pkg.name!) +
-        (process.platform === 'win32' ? '.exe' : '')
-    )
   }
 
   // Setup imported include paths.
@@ -347,6 +357,12 @@ export async function build(
       throw new Error(
         `"${lst.pkg.name}" is defined as JIT-only. Compilation has been aborted.`
       )
+    }
+
+    // Create the destination directory.
+    const destdir = path.dirname(destDirectory(bst, lst, isdep))
+    if (!fs.existsSync(destdir)) {
+      await fs.promises.mkdir(destdir, { recursive: true })
     }
 
     // TODO: Individually cancel projects that depend on this dep(?)

@@ -129,5 +129,6 @@ dist
 .yarn/install-state.gz
 .pnp.*
 
+.lattice/
 /lattice-init-sample
 /my-lattice-app
