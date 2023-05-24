@@ -5,6 +5,10 @@
 
 **lattice** is an incredibly lightweight C development environment that integrates well into the node ecosystem.
 
+<p align="center">
+  <img src="./coverage-badge.svg">
+</p>
+
 ## Features
 - **Build cross-platform applications with C.**  
   Everything you need to start building apps in C is included in lattice. Just create a project through the lattice CLI and get to writing code without worrying about configuration.

@@ -1,5 +1,12 @@
 {
-	"devDependencies": {
-		"vitest": "^0.31.1"
-	}
+  "devDependencies": {
+    "@vitest/coverage-c8": "^0.31.1",
+    "coverage-badges-cli": "^1.1.1",
+    "vitest": "^0.31.1"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "coverage": "vitest run --coverage",
+    "coverage:badges": "coverage-badges --output ./coverage-badge.svg"
+  }
 }
