@@ -193,7 +193,7 @@ async function main() {
       const [bst, lst] = await initBst(cwd, true, args.includes('--clean'))
       await build(bst, lst, log)
       log.unstatus(log.state.errs.length === 0)
-      await execJitBst(bst, cliOptions)
+      await execJitBst(bst, log, cliOptions)
     } else if (mode === 'build') {
       const log = new Logger()
       const [bst, lst] = await initBst(cwd, false, args.includes('--clean'))

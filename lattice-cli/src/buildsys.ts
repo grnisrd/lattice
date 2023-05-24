@@ -77,25 +77,25 @@ async function processAsync(command: string, args: string[]) {
     cwd: path.dirname(command),
   })
 
-  let childOutput = [] as string[]
+  let childOutput = ''
   childProcess.stdout.on('data', (data) => {
-    childOutput.push(data.toString())
+    childOutput += data.toString()
   })
   childProcess.stderr.on('data', (data) => {
-    childOutput.push(data.toString())
+    childOutput += data.toString()
   })
 
-  return new Promise<string[]>((resolve, reject) => {
+  return new Promise<void>((resolve, reject) => {
     childProcess.on('close', (code) => {
       if (code === 0) {
-        resolve(childOutput)
+        resolve()
       } else {
-        reject(childOutput)
+        reject(new Error(childOutput))
       }
     })
 
     childProcess.on('error', (err) => {
-      reject(childOutput)
+      reject(new Error(childOutput))
     })
   })
 }
@@ -349,18 +349,14 @@ export async function build(
       )
     }
 
+    // TODO: Individually cancel projects that depend on this dep(?)
     try {
       await processAsync(
         bst.compilerPath,
         await buildArgs(bst, lst, deps, isdep)
       )
-    } catch (output) {
-      try {
-        ;(output as string[]).forEach((l) => log.error(l))
-        return
-      } catch (e) {
-        throw e
-      }
+    } catch (e) {
+      log.error((e as Error).toString())
     }
   }
 
@@ -405,11 +401,19 @@ export async function initBst(root: string, jit?: boolean, clean?: boolean) {
  * @param bst JIT-ready BuildState
  * @param args Any arguments to pass to the program.
  */
-export async function execJitBst(bst: BuildState, args?: string[]) {
+export async function execJitBst(
+  bst: BuildState,
+  log: ILogger,
+  args?: string[]
+) {
   const jitargs = [
     '-run',
     ...(await buildArgs(bst, bst.rootState, bst.rootDeps)),
     ...(args ?? []),
   ]
-  await processAsync(bst.compilerPath, jitargs)
+  try {
+    await processAsync(bst.compilerPath, jitargs)
+  } catch (e) {
+    log.error((e as Error).toString())
+  }
 }

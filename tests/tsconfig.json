@@ -1,0 +1,9 @@
+{
+    "compilerOptions": {
+        "types": ["vitest/globals"],
+        "paths": {
+            "lattice-cli": ["../lattice-cli/src"],
+            "*": ["../lattice-cli/node_modules/*"]
+        }
+    }
+}
