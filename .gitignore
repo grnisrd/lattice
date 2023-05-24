@@ -132,3 +132,6 @@ dist
 .lattice/
 /lattice-init-sample
 /my-lattice-app
+
+# For testing bad imports.
+!/tests/projects/bad-dependency-import/node_modules

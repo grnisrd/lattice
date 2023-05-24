@@ -1,0 +1,23 @@
+{
+  "name": "hello-world-bad-deps",
+  "version": "1.0.0",
+  "description": "Sample project for a lattice application.",
+  "main": "./src/main.c",
+  "private": true,
+  "scripts": {
+    "run": "lattice run",
+    "build": "lattice build"
+  },
+  "lattice": {
+    "outdir": "./dist",
+    "type": "bin",
+    "boundaryChecks": "none",
+    "winpe": "console"
+  },
+  "dependencies": {
+    "_SAMPLE_IMPORT_DO_NOT_INSTALL": "^1.0.0"
+  },
+  "devDependencies": {
+    "@lattice/lattice": "^1.0.0"
+  }
+}

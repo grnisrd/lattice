@@ -36,6 +36,7 @@ export class Logger implements ILogger {
     warns: [] as string[],
     errs: [] as string[],
   }
+  states: this['state'][] = []
 
   private _silent: boolean
   private _statusOra: Ora | undefined
@@ -53,13 +54,15 @@ export class Logger implements ILogger {
     }
 
     // Print errors and warnings first.
-    if (this.state.init) {
+    if (this.state.init && !this._trueSilence) {
       this.state.errs.forEach((t) => console.error(t))
       this.state.warns.forEach((t) => console.warn(t))
       if (!this._silent) {
         this.state.infos.forEach((t) => console.info(t))
       }
     }
+
+    this.states.push(this.state)
 
     // Start spin with no status text.
     if (!this._silent) {
@@ -110,20 +113,21 @@ export class Logger implements ILogger {
 
   unstatus(good?: boolean) {
     good ? this._statusOra?.succeed() : this._statusOra?.fail()
-    if (this.state.init) {
+    if (this.state.init && !this._trueSilence) {
       this.state.errs.forEach((t) => console.error(t))
       this.state.warns.forEach((t) => console.warn(t))
       if (!this._silent) {
         this.state.infos.forEach((t) => console.info(t))
       }
     }
+    this.states.push(this.state)
   }
 
   /**
    *
    * @param silent If true, infos are silenced (but not warnings/errors).
    */
-  constructor(silent?: boolean) {
+  constructor(silent?: boolean, private _trueSilence?: boolean) {
     this._silent = silent ?? false
   }
 }

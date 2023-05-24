@@ -23,10 +23,27 @@ export function binary(lst: LatticeState) {
 }
 
 /**
- * Fail a test if the lattice logger has errors.
+ * Fail a test if the lattice logger has errors. If `invert` is true, it will
+ * fail if there are NO errors.
  */
-export async function loghopper(fn: (log: Logger) => Promise<void>) {
-  const log = new Logger(true)
+export async function loghopper(
+  fn: (log: Logger) => Promise<void>,
+  invert?: boolean
+) {
+  const log = new Logger(true, true)
   await fn(log)
-  expect(log.state.errs.length, log.state.errs.join('\n')).toBe(0)
+  log.unstatus()
+
+  let reportedErrors: string[] = []
+  for (const state of log.states) {
+    if (state.errs.length > 0) {
+      reportedErrors.push(...state.errs)
+    }
+  }
+
+  invert
+    ? expect(reportedErrors.length, reportedErrors.join('\n')).toBeGreaterThan(
+        0
+      )
+    : expect(reportedErrors.length, reportedErrors.join('\n')).toBe(0)
 }

@@ -4,6 +4,7 @@ import { spawn } from 'node:child_process'
 
 import { ILogger } from './logsys'
 import createState, { LatticeState, LatticePackage } from './state'
+import { MalformedDependencyError } from './exception'
 
 /**
  * Root of lattice-cli's source code.
@@ -166,8 +167,8 @@ async function dependencies(lst: LatticeState, log: ILogger) {
     // Early check for malformed imports.
     const depinfopath = path.join(realpkgpath, 'package.json')
     if (!fs.existsSync(depinfopath)) {
-      throw new Error(
-        `"${lst.pkg.name}" depends on "${pkgname}", which lacks a package.json (malformed dependency?)`
+      throw new MalformedDependencyError(
+        `"${lst.pkg.name}" depends on "${pkgname}", which lacks a package.json`
       )
     }
 
@@ -181,7 +182,7 @@ async function dependencies(lst: LatticeState, log: ILogger) {
       !depinfo.lattice ||
       depinfo.lattice.buildOptions?.type !== 'lib'
     ) {
-      throw new Error(
+      throw new MalformedDependencyError(
         `"${lst.pkg.name}" depends on "${pkgname}", which isn't a C library. If your project depends on JavaScript libraries, install them as devDependencies.`
       )
     }
@@ -332,7 +333,20 @@ export async function build(
   log.task(`Compiling "${lst.pkg.name}"`)
 
   // Retrieve and build dependencies.
-  const deps = await dependencies(lst, log)
+  let deps: readonly DependencyInfo[]
+
+  // Abort build if malformed deps.
+  try {
+    deps = await dependencies(lst, log)
+  } catch (e) {
+    if (e instanceof MalformedDependencyError) {
+      log.error(e.toString())
+    } else {
+      throw e // Unrecognized error.
+    }
+    return
+  }
+
   if (deps.length > 0) {
     // Create the folder for all dependencies to be built.
     if (!fs.existsSync(bst.libraryContainer)) {
